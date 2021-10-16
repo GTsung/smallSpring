@@ -22,6 +22,11 @@ public abstract class AbstractBeanFactory
         return doGetBean(beanName, args);
     }
 
+    @Override
+    public <T> T getBean(String beanName, Class<T> requiredType) throws BeansException {
+        return (T) getBean(beanName);
+    }
+
     protected <T> T doGetBean(final String beanName, final Object[] args) {
         Object bean = getSingleton(beanName);
         if (bean != null) {
