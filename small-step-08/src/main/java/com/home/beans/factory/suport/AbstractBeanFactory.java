@@ -5,6 +5,7 @@ import com.home.beans.BeansException;
 import com.home.beans.factory.factory.BeanDefinition;
 import com.home.beans.factory.factory.BeanPostProcessor;
 import com.home.beans.factory.factory.ConfigurableBeanFactory;
+import com.home.utils.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,8 @@ import java.util.List;
  */
 public abstract class AbstractBeanFactory
         extends DefaultSingletonBeanRegistry implements ConfigurableBeanFactory {
+
+    private ClassLoader beanClassLoader = ClassUtils.getDefaultClassLoader();
 
     private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
 
@@ -54,5 +57,9 @@ public abstract class AbstractBeanFactory
 
     public List<BeanPostProcessor> getBeanPostProcessors() {
         return this.beanPostProcessors;
+    }
+
+    public ClassLoader getBeanClassLoader() {
+        return this.beanClassLoader;
     }
 }

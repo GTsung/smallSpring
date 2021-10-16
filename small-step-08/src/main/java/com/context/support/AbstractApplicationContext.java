@@ -24,6 +24,10 @@ public abstract class AbstractApplicationContext
         // 获取beanFactory
         ConfigurableListableBeanFactory beanFactory = getBeanFactory();
 
+        // 添加ApplicationContextAwareProcessor，让继承ApplicationContextAware的bean
+        // 对象都能感知所属的ApplicationContext
+        beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
+
         // bean实例化前执行BeanFactoryPostProcessor
         invokeBeanFactoryPostProcessor(beanFactory);
 
