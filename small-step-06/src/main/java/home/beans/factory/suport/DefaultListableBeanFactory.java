@@ -2,6 +2,7 @@ package home.beans.factory.suport;
 
 
 import home.beans.BeansException;
+import home.beans.factory.ConfigurableListableBeanFactory;
 import home.beans.factory.factory.BeanDefinition;
 
 import java.util.HashMap;
@@ -13,7 +14,7 @@ import java.util.Map;
  */
 public class DefaultListableBeanFactory
         extends AbstractAutowireCapableBeanFactory
-        implements BeanDefinitionRegistry {
+        implements BeanDefinitionRegistry, ConfigurableListableBeanFactory {
 
     private Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
 
@@ -39,5 +40,22 @@ public class DefaultListableBeanFactory
     @Override
     public String[] getBeanDefinitionNames() {
         return beanDefinitionMap.keySet().toArray(new String[0]);
+    }
+
+    @Override
+    public <T> Map<String, T> getBeansOfType(Class<T> type) throws BeansException {
+        Map<String, T> result = new HashMap<>();
+        beanDefinitionMap.forEach((beanName, beanDefinition) -> {
+            Class beanClass = beanDefinition.getBeanClass();
+            if (type.isAssignableFrom(beanClass)) {
+                result.put(beanName, (T)getBean(beanName));
+            }
+        });
+        return result;
+    }
+
+    @Override
+    public void preInstantiateSingletons() throws BeansException {
+        beanDefinitionMap.keySet().forEach(this::getBean);
     }
 }
