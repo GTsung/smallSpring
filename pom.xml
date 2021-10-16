@@ -13,6 +13,7 @@
         <module>small-step-02</module>
         <module>small-step-03</module>
         <module>small-step-04</module>
+        <module>small-step-05</module>
     </modules>
 
     <properties>
