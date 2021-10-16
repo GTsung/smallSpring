@@ -19,6 +19,7 @@
         <module>small-step-08</module>
         <module>small-step-09</module>
         <module>small-step-10</module>
+        <module>small-step-11</module>
     </modules>
 
     <properties>
