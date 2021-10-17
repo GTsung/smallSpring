@@ -19,20 +19,32 @@ import java.lang.reflect.Method;
 public abstract class AbstractAutowireCapableBeanFactory
         extends AbstractBeanFactory implements AutowireCapableBeanFactory {
 
-    private InstantiationStrategy instantiationStrategy = new CglibSubclassingInstantiationStrategy();
+    private InstantiationStrategy instantiationStrategy = new SimpleInstantiationStrategy();
 
     @Override
     protected Object createBean(String beanName, BeanDefinition beanDefinition, Object[] args)
             throws BeansException {
+
+        // 判断是否返回代理对象
+        Object bean = resolveBeforeInstantiation(beanName, beanDefinition);
+        if (null != bean) {
+            return bean;
+        }
+        return doCreateBean(beanName, beanDefinition, args);
+    }
+
+    protected Object doCreateBean(String beanName, BeanDefinition beanDefinition, Object[] args) {
         Object bean = null;
         try {
-            // 判断是否返回代理对象
-            bean = resolveBeforeInstantiation(beanName, beanDefinition);
-            if (bean != null) {
-                return bean;
-            }
             // 实例化
             bean = createBeanInstance(beanName, beanDefinition, args);
+
+            // 处理循环依赖，实例化后的bean提前放入到缓存中
+            if (beanDefinition.isSingleton()) {
+                Object finalBean = bean;
+                // 先放入到三级缓存中
+                addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, beanDefinition, finalBean));
+            }
 
             // 实例化后判断
             boolean continueWithPropertyPopulation = applyBeanPostProcessorsAfterInstantiation(beanName, bean);
@@ -47,6 +59,7 @@ public abstract class AbstractAutowireCapableBeanFactory
             applyPropertyValues(beanName, bean, beanDefinition);
             // 执行bean的初始化方法和beanPostProcessor的前置和后置处理方法
             bean = initializeBean(beanName, bean, beanDefinition);
+
         } catch (Exception e) {
             throw new BeansException("bean实例化失败", e);
         }
@@ -54,11 +67,46 @@ public abstract class AbstractAutowireCapableBeanFactory
         // 注册实现了DisposableBean的接口的Bean对象
         registerDisposableBeanIfNecessary(beanName, bean, beanDefinition);
 
+        Object exposedObject = bean;
         if (beanDefinition.isSingleton()) {
-            // 添加到单例bean容器
-            addSingleton(beanName, bean);
+            // 获取代理对象
+            exposedObject = getSingleton(beanName);
+            registerSingleton(beanName, exposedObject);
         }
-        return bean;
+        return exposedObject;
+
+    }
+
+    protected Object getEarlyBeanReference(String beanName, BeanDefinition beanDefinition, Object bean) {
+        Object exposedObject = bean;
+        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
+                exposedObject = ((InstantiationAwareBeanPostProcessor) beanPostProcessor).getEarlyBeanReference(exposedObject, beanName);
+                if (null == exposedObject) return exposedObject;
+            }
+        }
+        return exposedObject;
+    }
+
+    /**
+     * Bean 实例化后对于返回 false 的对象，不在执行后续设置 Bean 对象属性的操作
+     *
+     * @param beanName
+     * @param bean
+     * @return
+     */
+    private boolean applyBeanPostProcessorsAfterInstantiation(String beanName, Object bean) {
+        boolean continueWithPropertyPopulation = true;
+        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
+                InstantiationAwareBeanPostProcessor instantiationAwareBeanPostProcessor = (InstantiationAwareBeanPostProcessor) beanPostProcessor;
+                if (!instantiationAwareBeanPostProcessor.postProcessAfterInstantiation(bean, beanName)) {
+                    continueWithPropertyPopulation = false;
+                    break;
+                }
+            }
+        }
+        return continueWithPropertyPopulation;
     }
 
     /**
@@ -81,6 +129,24 @@ public abstract class AbstractAutowireCapableBeanFactory
         }
     }
 
+    protected Object resolveBeforeInstantiation(String beanName, BeanDefinition beanDefinition) {
+        Object bean = applyBeanPostProcessorsBeforeInstantiation(beanDefinition.getBeanClass(), beanName);
+        if (null != bean) {
+            bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+        }
+        return bean;
+    }
+
+    protected Object applyBeanPostProcessorsBeforeInstantiation(Class<?> beanClass, String beanName) {
+        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
+                Object result = ((InstantiationAwareBeanPostProcessor) beanPostProcessor).postProcessBeforeInstantiation(beanClass, beanName);
+                if (null != result) return result;
+            }
+        }
+        return null;
+    }
+
     protected void registerDisposableBeanIfNecessary(String beanName, Object bean, BeanDefinition beanDefinition) {
         if (!beanDefinition.isSingleton()) {
             return;
@@ -89,6 +155,46 @@ public abstract class AbstractAutowireCapableBeanFactory
             registerDisposableBean(beanName, new DisposableBeanAdapter(bean, beanName, beanDefinition));
         }
     }
+
+    protected Object createBeanInstance(String beanName, BeanDefinition beanDefinition, Object[] args) {
+        Constructor constructor = null;
+        Class<?> beanClass = beanDefinition.getBeanClass();
+        Constructor<?>[] declaredConstructors = beanClass.getDeclaredConstructors();
+        for (Constructor c : declaredConstructors) {
+            if (null != args && c.getParameters().length == args.length) {
+                constructor = c;
+                break;
+            }
+        }
+        return instantiationStrategy.instantiate(beanDefinition, beanName, constructor, args);
+    }
+
+    protected void applyPropertyValues(String beanName, Object bean, BeanDefinition beanDefinition) {
+        try {
+            PropertyValues propertyValues = beanDefinition.getPropertyValues();
+            for (PropertyValue pv : propertyValues.getPropertyValues()) {
+                String name = pv.getName();
+                Object value = pv.getValue();
+                if (value instanceof BeanReference) {
+                    BeanReference beanReference = (BeanReference) value;
+                    value = getBean(beanReference.getBeanName());
+                }
+                BeanUtil.setFieldValue(bean, name, value);
+            }
+        } catch (Exception e) {
+            throw new BeansException("error setting property value", e);
+        }
+    }
+
+    public InstantiationStrategy getInstantiationStrategy() {
+        return instantiationStrategy;
+    }
+
+    public void setInstantiationStrategy(InstantiationStrategy instantiationStrategy) {
+        this.instantiationStrategy = instantiationStrategy;
+    }
+
+
 
     private Object initializeBean(String beanName, Object bean, BeanDefinition beanDefinition) {
 
@@ -116,44 +222,24 @@ public abstract class AbstractAutowireCapableBeanFactory
         return wrappedBean;
     }
 
-    protected Object resolveBeforeInstantiation(String beanName, BeanDefinition beanDefinition) {
-        Object bean = applyBeanPostProcessorsBeforeInstantiation(beanDefinition.getBeanClass(), beanName);
-        if (null != bean) {
-            bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+
+
+    private void invokeInitMethods(String beanName, Object bean, BeanDefinition beanDefinition) throws Exception {
+        // 如果bean实现了InitializingBean接口，则调用初始化方法
+        if (bean instanceof InitializingBean) {
+            ((InitializingBean) bean).afterPropertiesSet();
         }
-        return bean;
+        String initMethodName = beanDefinition.getInitMethodName();
+        if (StrUtil.isNotEmpty(initMethodName)) {
+            Method initMethod = beanDefinition.getBeanClass().getMethod(initMethodName);
+            if (null == initMethod) {
+                throw new BeansException("could not find an init method named " + initMethodName);
+            }
+            initMethod.invoke(bean);
+        }
     }
 
-    protected Object applyBeanPostProcessorsBeforeInstantiation(Class<?> beanClass, String beanName) {
-        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
-            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
-                Object result = ((InstantiationAwareBeanPostProcessor) beanPostProcessor).postProcessBeforeInstantiation(beanClass, beanName);
-                if (null != result) return result;
-            }
-        }
-        return null;
-    }
 
-    /**
-     * Bean 实例化后对于返回 false 的对象，不在执行后续设置 Bean 对象属性的操作
-     *
-     * @param beanName
-     * @param bean
-     * @return
-     */
-    private boolean applyBeanPostProcessorsAfterInstantiation(String beanName, Object bean) {
-        boolean continueWithPropertyPopulation = true;
-        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
-            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
-                InstantiationAwareBeanPostProcessor instantiationAwareBeanPostProcessor = (InstantiationAwareBeanPostProcessor) beanPostProcessor;
-                if (!instantiationAwareBeanPostProcessor.postProcessAfterInstantiation(bean, beanName)) {
-                    continueWithPropertyPopulation = false;
-                    break;
-                }
-            }
-        }
-        return continueWithPropertyPopulation;
-    }
 
     @Override
     public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName) throws BeansException {
@@ -183,56 +269,11 @@ public abstract class AbstractAutowireCapableBeanFactory
         return result;
     }
 
-    private void invokeInitMethods(String beanName, Object bean, BeanDefinition beanDefinition) throws Exception {
-        // 如果bean实现了InitializingBean接口，则调用初始化方法
-        if (bean instanceof InitializingBean) {
-            ((InitializingBean) bean).afterPropertiesSet();
-        }
-        String initMethodName = beanDefinition.getInitMethodName();
-        if (StrUtil.isNotEmpty(initMethodName)) {
-            Method initMethod = beanDefinition.getBeanClass().getMethod(initMethodName);
-            if (null == initMethod) {
-                throw new BeansException("could not find an init method named " + initMethodName);
-            }
-            initMethod.invoke(bean);
-        }
-    }
 
-    protected void applyPropertyValues(String beanName, Object bean, BeanDefinition beanDefinition) {
-        try {
-            PropertyValues propertyValues = beanDefinition.getPropertyValues();
-            for (PropertyValue pv : propertyValues.getPropertyValues()) {
-                String name = pv.getName();
-                Object value = pv.getValue();
-                if (value instanceof BeanReference) {
-                    BeanReference beanReference = (BeanReference) value;
-                    value = getBean(beanReference.getBeanName());
-                }
-                BeanUtil.setFieldValue(bean, name, value);
-            }
-        } catch (Exception e) {
-            throw new BeansException("error setting property value", e);
-        }
-    }
 
-    protected Object createBeanInstance(String beanName, BeanDefinition beanDefinition, Object[] args) {
-        Constructor constructor = null;
-        Class<?> beanClass = beanDefinition.getBeanClass();
-        Constructor<?>[] declaredConstructors = beanClass.getDeclaredConstructors();
-        for (Constructor c : declaredConstructors) {
-            if (null != args && c.getParameters().length == args.length) {
-                constructor = c;
-                break;
-            }
-        }
-        return instantiationStrategy.instantiate(beanDefinition, beanName, constructor, args);
-    }
 
-    public InstantiationStrategy getInstantiationStrategy() {
-        return instantiationStrategy;
-    }
 
-    public void setInstantiationStrategy(InstantiationStrategy instantiationStrategy) {
-        this.instantiationStrategy = instantiationStrategy;
-    }
+
+
+
 }

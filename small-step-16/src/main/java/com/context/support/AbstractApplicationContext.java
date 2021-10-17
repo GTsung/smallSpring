@@ -58,27 +58,15 @@ public abstract class AbstractApplicationContext
         finishRefresh();
     }
 
+    protected abstract void refreshBeanFactory() throws BeansException;
 
-    private void finishRefresh() {
-        publishEvent(new ContextRefreshedEvent(this));
-    }
+    protected abstract ConfigurableListableBeanFactory getBeanFactory();
 
-    @Override
-    public void publishEvent(ApplicationEvent event) {
-        applicationEventMulticaster.multicastEvent(event);
-    }
-
-    private void registerListeners() {
-        Collection<ApplicationListener> applicationListeners = getBeansOfType(ApplicationListener.class).values();
-        for (ApplicationListener listener : applicationListeners) {
-            applicationEventMulticaster.addApplicationListener(listener);
+    private void invokeBeanFactoryPostProcessor(ConfigurableListableBeanFactory beanFactory) {
+        Map<String, BeanFactoryPostProcessor> beanFactoryPostProcessorMap = beanFactory.getBeansOfType(BeanFactoryPostProcessor.class);
+        for (BeanFactoryPostProcessor beanFactoryPostProcessor : beanFactoryPostProcessorMap.values()) {
+            beanFactoryPostProcessor.postProcessBeanFactory(beanFactory);
         }
-    }
-
-    private void initApplicationEventMulticaster() {
-        ConfigurableListableBeanFactory beanFactory = getBeanFactory();
-        applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
-        beanFactory.registerSingleton(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, applicationEventMulticaster);
     }
 
     private void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFactory) {
@@ -88,16 +76,27 @@ public abstract class AbstractApplicationContext
         }
     }
 
-    private void invokeBeanFactoryPostProcessor(ConfigurableListableBeanFactory beanFactory) {
-        Map<String, BeanFactoryPostProcessor> beanFactoryPostProcessorMap = beanFactory.getBeansOfType(BeanFactoryPostProcessor.class);
-        for (BeanFactoryPostProcessor beanFactoryPostProcessor : beanFactoryPostProcessorMap.values()) {
-            beanFactoryPostProcessor.postProcessBeanFactory(beanFactory);
+    private void initApplicationEventMulticaster() {
+        ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+        applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
+        beanFactory.registerSingleton(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, applicationEventMulticaster);
+    }
+
+    private void registerListeners() {
+        Collection<ApplicationListener> applicationListeners = getBeansOfType(ApplicationListener.class).values();
+        for (ApplicationListener listener : applicationListeners) {
+            applicationEventMulticaster.addApplicationListener(listener);
         }
     }
 
-    protected abstract ConfigurableListableBeanFactory getBeanFactory();
+    private void finishRefresh() {
+        publishEvent(new ContextRefreshedEvent(this));
+    }
 
-    protected abstract void refreshBeanFactory() throws BeansException;
+    @Override
+    public void publishEvent(ApplicationEvent event) {
+        applicationEventMulticaster.multicastEvent(event);
+    }
 
     @Override
     public <T> Map<String, T> getBeansOfType(Class<T> type) throws BeansException {

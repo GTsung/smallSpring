@@ -15,7 +15,8 @@ import java.lang.reflect.Field;
  * @author GTsung
  * @date 2021/10/17
  */
-public class AutowiredAnnotationBeanPostProcessor implements InstantiationAwareBeanPostProcessor, BeanFactoryAware {
+public class AutowiredAnnotationBeanPostProcessor
+        implements InstantiationAwareBeanPostProcessor, BeanFactoryAware {
 
     private ConfigurableListableBeanFactory beanFactory;
 

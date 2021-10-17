@@ -1,0 +1,22 @@
+package com.bean;
+
+/**
+ * @author GTsung
+ * @date 2021/10/17
+ */
+public class Husband {
+
+    private Wife wife;
+
+    public String queryWife(){
+        return "Husband.wife";
+    }
+
+    public Wife getWife() {
+        return wife;
+    }
+
+    public void setWife(Wife wife) {
+        this.wife = wife;
+    }
+}
