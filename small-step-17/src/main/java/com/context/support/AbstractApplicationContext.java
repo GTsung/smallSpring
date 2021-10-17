@@ -144,6 +144,11 @@ public abstract class AbstractApplicationContext
     }
 
     @Override
+    public boolean containsBean(String name) {
+        return getBeanFactory().containsBean(name);
+    }
+
+    @Override
     public void registerShutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close));
     }
