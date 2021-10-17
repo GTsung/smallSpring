@@ -23,6 +23,7 @@
         <module>small-step-12</module>
         <module>small-step-13</module>
         <module>small-step-14</module>
+        <module>small-step-15</module>
     </modules>
 
     <properties>
