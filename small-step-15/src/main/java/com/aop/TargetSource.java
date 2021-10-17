@@ -1,5 +1,7 @@
 package com.aop;
 
+import com.home.utils.ClassUtils;
+
 /**
  * @author GTsung
  * @date 2021/10/16
@@ -20,7 +22,9 @@ public class TargetSource {
      * @return the type of targets returned by this {@link TargetSource}
      */
     public Class<?>[] getTargetClass(){
-        return this.target.getClass().getInterfaces();
+        Class<?> clazz = this.target.getClass();
+        clazz = ClassUtils.isCglibProxyClass(clazz) ? clazz.getSuperclass() : clazz;
+        return clazz.getInterfaces();
     }
 
     /**
