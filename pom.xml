@@ -21,6 +21,7 @@
         <module>small-step-10</module>
         <module>small-step-11</module>
         <module>small-step-12</module>
+        <module>small-step-13</module>
     </modules>
 
     <properties>
