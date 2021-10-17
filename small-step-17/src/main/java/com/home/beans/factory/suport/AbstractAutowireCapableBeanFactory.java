@@ -3,6 +3,8 @@ package com.home.beans.factory.suport;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.TypeUtil;
+import com.convert.ConversionService;
 import com.home.beans.BeansException;
 import com.home.beans.PropertyValue;
 import com.home.beans.PropertyValues;
@@ -178,6 +180,15 @@ public abstract class AbstractAutowireCapableBeanFactory
                 if (value instanceof BeanReference) {
                     BeanReference beanReference = (BeanReference) value;
                     value = getBean(beanReference.getBeanName());
+                } else {
+                    Class<?> sourceType = value.getClass();
+                    Class<?> targetType = (Class<?>) TypeUtil.getFieldType(bean.getClass(), name);
+                    ConversionService conversionService = getConversionService();
+                    if (conversionService != null) {
+                        if (conversionService.canConvert(sourceType, targetType)) {
+                            value = conversionService.convert(value, targetType);
+                        }
+                    }
                 }
                 BeanUtil.setFieldValue(bean, name, value);
             }

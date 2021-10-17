@@ -1,6 +1,8 @@
 package com.home.beans.factory.annotation;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.TypeUtil;
+import com.convert.ConversionService;
 import com.home.beans.BeansException;
 import com.home.beans.PropertyValues;
 import com.home.beans.factory.BeanFactory;
@@ -36,8 +38,19 @@ public class AutowiredAnnotationBeanPostProcessor
         for (Field field : declaredFields) {
             Value valueAnnotation = field.getAnnotation(Value.class);
             if (null != valueAnnotation) {
-                String value = valueAnnotation.value();
-                value = beanFactory.resolveEmbeddedValue(value);
+                Object value = valueAnnotation.value();
+                value = beanFactory.resolveEmbeddedValue((String) value);
+
+                // 类型转换
+                Class<?> sourceType = value.getClass();
+                Class<?> targetType = (Class<?>) TypeUtil.getType(field);
+                ConversionService conversionService = beanFactory.getConversionService();
+                if (conversionService != null) {
+                    if (conversionService.canConvert(sourceType, targetType)) {
+                        value = conversionService.convert(value, targetType);
+                    }
+                }
+
                 BeanUtil.setFieldValue(bean, field.getName(), value);
             }
         }

@@ -7,6 +7,7 @@ import com.context.event.ApplicationEventMulticaster;
 import com.context.event.ContextClosedEvent;
 import com.context.event.ContextRefreshedEvent;
 import com.context.event.SimpleApplicationEventMulticaster;
+import com.convert.ConversionService;
 import com.home.beans.BeansException;
 import com.home.beans.factory.ConfigurableListableBeanFactory;
 import com.home.beans.factory.factory.BeanFactoryPostProcessor;
@@ -51,11 +52,25 @@ public abstract class AbstractApplicationContext
         // 注册事件监听器
         registerListeners();
 
-        // 提前实例化单例bean对象
-        beanFactory.preInstantiateSingletons();
+        // 设置类型转换器、提前实例化单例Bean对象
+        finishBeanFactoryInitialization(beanFactory);
 
         // 发布容器刷新完成事件
         finishRefresh();
+    }
+
+    // 设置类型转换器、提前实例化单例Bean对象
+    protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
+        // 设置类型转换器
+        if (beanFactory.containsBean("conversionService")) {
+            Object conversionService = beanFactory.getBean("conversionService");
+            if (conversionService instanceof ConversionService) {
+                beanFactory.setConversionService((ConversionService) conversionService);
+            }
+        }
+
+        // 提前实例化单例Bean对象
+        beanFactory.preInstantiateSingletons();
     }
 
     protected abstract void refreshBeanFactory() throws BeansException;

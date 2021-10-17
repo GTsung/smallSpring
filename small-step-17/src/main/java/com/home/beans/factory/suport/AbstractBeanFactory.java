@@ -1,6 +1,7 @@
 package com.home.beans.factory.suport;
 
 
+import com.convert.ConversionService;
 import com.home.beans.BeansException;
 import com.home.beans.factory.FactoryBean;
 import com.home.beans.factory.factory.BeanDefinition;
@@ -28,6 +29,8 @@ public abstract class AbstractBeanFactory
      */
     private final List<StringValueResolver> embeddedValueResolvers = new ArrayList<>();
 
+    private ConversionService conversionService;
+
     @Override
     public Object getBean(String beanName) throws BeansException {
         return doGetBean(beanName, null);
@@ -42,6 +45,13 @@ public abstract class AbstractBeanFactory
     public <T> T getBean(String beanName, Class<T> requiredType) throws BeansException {
         return (T) getBean(beanName);
     }
+
+    @Override
+    public boolean containsBean(String beanName) {
+        return containsBeanDefinition(beanName);
+    }
+
+    protected abstract boolean containsBeanDefinition(String beanName);
 
     protected <T> T doGetBean(final String beanName, final Object[] args) {
         Object sharedInstance = getSingleton(beanName);
@@ -88,6 +98,16 @@ public abstract class AbstractBeanFactory
             result = resolver.resolveStringValue(result);
         }
         return result;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
+    }
+
+    @Override
+    public ConversionService getConversionService() {
+        return conversionService;
     }
 
     public List<BeanPostProcessor> getBeanPostProcessors() {
