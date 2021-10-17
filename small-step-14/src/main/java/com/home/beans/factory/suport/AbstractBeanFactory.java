@@ -7,6 +7,7 @@ import com.home.beans.factory.factory.BeanDefinition;
 import com.home.beans.factory.factory.BeanPostProcessor;
 import com.home.beans.factory.factory.ConfigurableBeanFactory;
 import com.home.utils.ClassUtils;
+import com.home.utils.StringValueResolver;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,11 @@ public abstract class AbstractBeanFactory
     private ClassLoader beanClassLoader = ClassUtils.getDefaultClassLoader();
 
     private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+
+    /**
+     * String resolvers to apply e.g. to annotation attribute values
+     */
+    private final List<StringValueResolver> embeddedValueResolvers = new ArrayList<>();
 
     @Override
     public Object getBean(String beanName) throws BeansException {
@@ -68,6 +74,20 @@ public abstract class AbstractBeanFactory
     public void addBeanPostProcessor(BeanPostProcessor beanPostProcessor) {
         this.beanPostProcessors.remove(beanPostProcessor);
         this.beanPostProcessors.add(beanPostProcessor);
+    }
+
+    @Override
+    public void addEmbeddedValueResolver(StringValueResolver valueResolver) {
+        this.embeddedValueResolvers.add(valueResolver);
+    }
+
+    @Override
+    public String resolveEmbeddedValue(String value) {
+        String result = value;
+        for (StringValueResolver resolver : this.embeddedValueResolvers) {
+            result = resolver.resolveStringValue(result);
+        }
+        return result;
     }
 
     public List<BeanPostProcessor> getBeanPostProcessors() {

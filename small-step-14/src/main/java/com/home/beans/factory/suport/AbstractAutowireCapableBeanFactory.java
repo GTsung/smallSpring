@@ -7,10 +7,7 @@ import com.home.beans.BeansException;
 import com.home.beans.PropertyValue;
 import com.home.beans.PropertyValues;
 import com.home.beans.factory.*;
-import com.home.beans.factory.factory.AutowireCapableBeanFactory;
-import com.home.beans.factory.factory.BeanDefinition;
-import com.home.beans.factory.factory.BeanPostProcessor;
-import com.home.beans.factory.factory.BeanReference;
+import com.home.beans.factory.factory.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -29,7 +26,17 @@ public abstract class AbstractAutowireCapableBeanFactory
             throws BeansException {
         Object bean = null;
         try {
+            // 判断是否返回代理对象
+            bean = resolveBeforeInstantiation(beanName, beanDefinition);
+            if (bean != null) {
+                return bean;
+            }
+            // 实例化
             bean = createBeanInstance(beanName, beanDefinition, args);
+
+            // 在修改属性前，允许BeanPostProcessor修改属性值
+            applyBeanPostProcessorsBeforeApplyingPropertyValues(beanName, bean, beanDefinition);
+
             // 给bean填充属性
             applyPropertyValues(beanName, bean, beanDefinition);
             // 执行bean的初始化方法和beanPostProcessor的前置和后置处理方法
@@ -46,6 +53,26 @@ public abstract class AbstractAutowireCapableBeanFactory
             addSingleton(beanName, bean);
         }
         return bean;
+    }
+
+    /**
+     * 在设置 Bean 属性之前，允许 BeanPostProcessor 修改属性值
+     *
+     * @param beanName
+     * @param bean
+     * @param beanDefinition
+     */
+    protected void applyBeanPostProcessorsBeforeApplyingPropertyValues(String beanName, Object bean, BeanDefinition beanDefinition) {
+        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor){
+                PropertyValues pvs = ((InstantiationAwareBeanPostProcessor) beanPostProcessor).postProcessPropertyValues(beanDefinition.getPropertyValues(), bean, beanName);
+                if (null != pvs) {
+                    for (PropertyValue propertyValue : pvs.getPropertyValues()) {
+                        beanDefinition.getPropertyValues().addPropertyValue(propertyValue);
+                    }
+                }
+            }
+        }
     }
 
     protected void registerDisposableBeanIfNecessary(String beanName, Object bean, BeanDefinition beanDefinition) {
@@ -81,6 +108,24 @@ public abstract class AbstractAutowireCapableBeanFactory
         // 执行后置方法
         wrappedBean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
         return wrappedBean;
+    }
+
+    protected Object resolveBeforeInstantiation(String beanName, BeanDefinition beanDefinition) {
+        Object bean = applyBeanPostProcessorsBeforeInstantiation(beanDefinition.getBeanClass(), beanName);
+        if (null != bean) {
+            bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+        }
+        return bean;
+    }
+
+    protected Object applyBeanPostProcessorsBeforeInstantiation(Class<?> beanClass, String beanName) {
+        for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+            if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
+                Object result = ((InstantiationAwareBeanPostProcessor) beanPostProcessor).postProcessBeforeInstantiation(beanClass, beanName);
+                if (null != result) return result;
+            }
+        }
+        return null;
     }
 
     @Override
