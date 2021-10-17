@@ -4,6 +4,7 @@ import com.context.ApplicationEvent;
 import com.context.ApplicationListener;
 import com.context.ConfigurableApplicationContext;
 import com.context.event.ApplicationEventMulticaster;
+import com.context.event.ContextClosedEvent;
 import com.context.event.ContextRefreshedEvent;
 import com.context.event.SimpleApplicationEventMulticaster;
 import com.home.beans.BeansException;
@@ -135,6 +136,8 @@ public abstract class AbstractApplicationContext
 
     @Override
     public void close() {
+        // 发布容器关闭事件
+        publishEvent(new ContextClosedEvent(this));
         getBeanFactory().destroySingletons();
     }
 }
